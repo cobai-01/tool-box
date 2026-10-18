@@ -206,8 +206,9 @@ $main = {
                 </StackPanel>
                 <Border x:Name="ck" Grid.Column="2" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5"
                         BorderBrush="{DynamicResource LineBrush}" Margin="8,0,0,0">
-                  <Path x:Name="tick" Data="M5,10 L8.5,13.5 L14.5,6.5" Stroke="{DynamicResource AccentTextBrush}"
-                        StrokeThickness="2" Visibility="Collapsed"/>
+                  <Path x:Name="tick" Data="M0,4 L3.5,7.5 L10,0" Stroke="{DynamicResource AccentTextBrush}"
+                        StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0" Visibility="Collapsed"/>
                 </Border>
               </Grid>
             </Border>
