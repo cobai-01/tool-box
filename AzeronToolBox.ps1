@@ -1,5 +1,5 @@
 <#
-    AZERON TOOL BOX
+    AZERON'S TOOL BOX
     Modern WPF software installer for Windows (uses winget).
     Single file - the UI opens instantly; app icons load in the background
     and are cached in %APPDATA%\AzeronToolBox\icons.
@@ -79,7 +79,7 @@ $main = {
     $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Azeron Tool Box" Width="1120" Height="740" WindowStartupLocation="CenterScreen"
+        Title="Azeron's Tool Box" Width="1120" Height="740" WindowStartupLocation="CenterScreen"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="CanMinimize" FontFamily="Segoe UI" UseLayoutRounding="True">
   <Window.Resources>
@@ -248,7 +248,7 @@ $main = {
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
-            <TextBlock Text="AZERON TOOL BOX" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+            <TextBlock Text="AZERON'S TOOL BOX" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
             <TextBlock Text="Install your favorite software in one click" FontSize="11" Foreground="{DynamicResource SubTextBrush}"/>
           </StackPanel>
         </StackPanel>
@@ -307,6 +307,7 @@ $main = {
             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="12,0,0,0">
               <Button x:Name="BtnAll" Style="{StaticResource GhostBtn}" Content="Select all" Margin="0,0,8,0"/>
               <Button x:Name="BtnNone" Style="{StaticResource GhostBtn}" Content="Clear" Margin="0,0,8,0"/>
+              <Button x:Name="BtnUninstall" Style="{StaticResource GhostBtn}" Content="Uninstall (0)" Margin="0,0,8,0" IsEnabled="False"/>
               <Button x:Name="BtnInstall" Style="{StaticResource PrimaryBtn}" Content="Install selected (0)" IsEnabled="False"/>
             </StackPanel>
           </Grid>
@@ -314,6 +315,8 @@ $main = {
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="-6,12,0,0">
             <WrapPanel x:Name="CardPanel"/>
           </ScrollViewer>
+          <TextBlock x:Name="Empty" Grid.Row="1" Text="Nothing installed through Azeron's Tool Box yet." FontSize="13"
+                     Foreground="{DynamicResource SubTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
 
           <StackPanel Grid.Row="2" Margin="0,10,0,0">
             <TextBlock x:Name="Status" Text="Ready." FontSize="12" Foreground="{DynamicResource SubTextBrush}"/>
@@ -340,7 +343,7 @@ $main = {
     $win = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xml))
 
     $ui = @{}
-    foreach ($n in 'TitleBar','BtnMin','BtnClose','Nav','CardPanel','Search','SearchHint','BtnAll','BtnNone','BtnInstall','Log','Progress','Status','AdminInfo') {
+    foreach ($n in 'TitleBar','BtnMin','BtnClose','Nav','CardPanel','Search','SearchHint','BtnAll','BtnNone','BtnUninstall','BtnInstall','Empty','Log','Progress','Status','AdminInfo') {
         $ui[$n] = $win.FindName($n)
     }
     $ctx = @{ Cards = New-Object System.Collections.ArrayList; Cat = 'All'; Busy = $false }
@@ -354,19 +357,51 @@ $main = {
     $ui.BtnMin.Add_Click({ $win.WindowState = 'Minimized' }.GetNewClosure())
     $ui.BtnClose.Add_Click({ $win.Close() }.GetNewClosure())
 
+    # Installed-apps tracking (only apps installed through this tool)
+    $ctx.Installed = @{}
+    $ctx.StateFile = Join-Path $env:APPDATA 'AzeronToolBox\installed.json'
+    try {
+        if (Test-Path $ctx.StateFile) {
+            $raw = Get-Content $ctx.StateFile -Raw
+            if ($raw) { foreach ($id in @($raw | ConvertFrom-Json)) { $ctx.Installed["$id"] = $true } }
+        }
+    } catch {}
+    $ctx.SaveInstalled = {
+        try {
+            $dir = Split-Path $ctx.StateFile
+            if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+            ConvertTo-Json -InputObject @($ctx.Installed.Keys) | Set-Content -Path $ctx.StateFile -Encoding UTF8
+        } catch {}
+    }
+    $ctx.UpdateTags = {
+        $dot = [string][char]0x2022
+        foreach ($c in $ctx.Cards) {
+            $a = $c.DataContext
+            $c.Tag = if ($ctx.Installed.ContainsKey($a.Id)) { "$($a.Cat)  $dot  Installed" } else { $a.Cat }
+        }
+    }
+
     # Refresh (filter + counters)
     $ctx.Refresh = {
         $term = $ui.Search.Text.Trim()
-        $count = 0
+        $sel = 0; $selInst = 0; $visible = 0
         foreach ($c in $ctx.Cards) {
-            $app   = $c.DataContext
-            $okCat = ($ctx.Cat -eq 'All') -or ($app.Cat -eq $ctx.Cat)
+            $app    = $c.DataContext
+            $isInst = $ctx.Installed.ContainsKey($app.Id)
+            if     ($ctx.Cat -eq 'All')       { $okCat = $true }
+            elseif ($ctx.Cat -eq 'Installed') { $okCat = $isInst }
+            else                              { $okCat = ($app.Cat -eq $ctx.Cat) }
             $okTxt = (-not $term) -or ($app.Name -like "*$term*")
-            $c.Visibility = if ($okCat -and $okTxt) { 'Visible' } else { 'Collapsed' }
-            if ($c.IsChecked) { $count++ }
+            $show  = $okCat -and $okTxt
+            $c.Visibility = if ($show) { 'Visible' } else { 'Collapsed' }
+            if ($show) { $visible++ }
+            if ($c.IsChecked) { $sel++; if ($isInst) { $selInst++ } }
         }
-        $ui.BtnInstall.Content   = "Install selected ($count)"
-        $ui.BtnInstall.IsEnabled = ($count -gt 0) -and (-not $ctx.Busy)
+        $ui.Empty.Visibility       = if ($ctx.Cat -eq 'Installed' -and $visible -eq 0) { 'Visible' } else { 'Collapsed' }
+        $ui.BtnInstall.Content     = "Install selected ($sel)"
+        $ui.BtnInstall.IsEnabled   = ($sel -gt 0) -and (-not $ctx.Busy)
+        $ui.BtnUninstall.Content   = "Uninstall ($selInst)"
+        $ui.BtnUninstall.IsEnabled = ($selInst -gt 0) -and (-not $ctx.Busy)
     }
     $ctx.OnToggle = { & $ctx.Refresh }.GetNewClosure()
 
@@ -425,8 +460,10 @@ $main = {
         [void]$ui.CardPanel.Children.Add($cb)
     }
 
+    & $ctx.UpdateTags
+
     # Category navigation
-    $cats = @('All') + ($catalog | ForEach-Object { $_.Split('|')[0] } | Select-Object -Unique)
+    $cats = @('All', 'Installed') + ($catalog | ForEach-Object { $_.Split('|')[0] } | Select-Object -Unique)
     $navStyle = $win.FindResource('NavBtn')
     foreach ($c in $cats) {
         $rb = New-Object Windows.Controls.RadioButton
@@ -455,12 +492,22 @@ $main = {
     $ctx.Timer.Add_Tick({
         $line = $null
         $done = $false
+        $changed = $false
         while ($ctx.Queue -and $ctx.Queue.TryDequeue([ref]$line)) {
             if ($line -eq '::DONE::') { $done = $true; continue }
+            if ($line.StartsWith('::ADD|')) { $ctx.Installed[$line.Substring(6)] = $true; $changed = $true; continue }
+            if ($line.StartsWith('::REM|')) {
+                $rid = $line.Substring(6)
+                $ctx.Installed.Remove($rid)
+                foreach ($c in $ctx.Cards) { if ($c.DataContext.Id -eq $rid) { $c.IsChecked = $false } }
+                $changed = $true
+                continue
+            }
             if ($line.StartsWith('>>')) { $ui.Status.Text = $line.Substring(2).Trim() }
             $ui.Log.AppendText($line + "`r`n")
         }
         $ui.Log.ScrollToEnd()
+        if ($changed) { & $ctx.SaveInstalled; & $ctx.UpdateTags; & $ctx.Refresh }
         if ($done) {
             $ctx.Timer.Stop()
             $ctx.Busy = $false
@@ -470,15 +517,13 @@ $main = {
         }
     }.GetNewClosure())
 
-    # Install
-    $ui.BtnInstall.Add_Click({
+    # Run install / uninstall in a background runspace
+    $ctx.Run = {
+        param($mode, $items)
         if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-            [void][Windows.MessageBox]::Show('winget was not found. Install "App Installer" from the Microsoft Store, then try again.', 'Azeron Tool Box', 'OK', 'Warning')
+            [void][Windows.MessageBox]::Show('winget was not found. Install "App Installer" from the Microsoft Store, then try again.', "Azeron's Tool Box", 'OK', 'Warning')
             return
         }
-        $items = @($ctx.Cards | Where-Object { $_.IsChecked } | ForEach-Object { $_.DataContext })
-        if ($items.Count -eq 0) { return }
-
         $ctx.Busy = $true
         & $ctx.Refresh
         $ui.Progress.Visibility = 'Visible'
@@ -491,16 +536,22 @@ $main = {
         $ctx.PS.Runspace = $ctx.RS
 
         $worker = {
-            param($items, $q)
+            param($items, $q, $mode)
             [Console]::OutputEncoding = [Text.Encoding]::UTF8
             $blocks = '[' + [char]0x2588 + [char]0x2592 + ']'
             $i = 0; $ok = 0; $fail = 0
             foreach ($a in $items) {
                 $i++
-                $q.Enqueue(">> [$i/$($items.Count)] Installing $($a.Name)...")
+                if ($mode -eq 'uninstall') {
+                    $q.Enqueue(">> [$i/$($items.Count)] Uninstalling $($a.Name)...")
+                    $wargs = @('uninstall', '--id', $a.Id, '-e', '--silent', '--accept-source-agreements', '--disable-interactivity')
+                } else {
+                    $q.Enqueue(">> [$i/$($items.Count)] Installing $($a.Name)...")
+                    $wargs = @('install', '--id', $a.Id, '-e', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity')
+                }
                 $code = 0
                 try {
-                    & winget install --id $a.Id -e --silent --accept-package-agreements --accept-source-agreements --disable-interactivity 2>&1 |
+                    & winget @wargs 2>&1 |
                         ForEach-Object {
                             $t = "$_".Trim()
                             if ($t.Length -gt 3 -and $t -notmatch $blocks -and $t -notmatch '\d\s*(KB|MB|GB)\s*/') { $q.Enqueue("   $t") }
@@ -510,23 +561,48 @@ $main = {
                     $code = -1
                     $q.Enqueue("   $_")
                 }
-                # 0 = ok, -1978335189 = already up to date, -1978335135 = already installed
-                if ($code -eq 0 -or $code -eq -1978335189 -or $code -eq -1978335135) {
-                    $ok++;   $q.Enqueue("[OK]   $($a.Name)")
+                if ($mode -eq 'uninstall') {
+                    if ($code -eq 0) {
+                        $ok++;   $q.Enqueue("[OK]   Removed $($a.Name)"); $q.Enqueue("::REM|$($a.Id)")
+                    } elseif ($code -eq -1978335212) {
+                        $ok++;   $q.Enqueue("[--]   $($a.Name) was not installed anymore"); $q.Enqueue("::REM|$($a.Id)")
+                    } else {
+                        $fail++; $q.Enqueue("[FAIL] $($a.Name) (exit code $code)")
+                    }
                 } else {
-                    $fail++; $q.Enqueue("[FAIL] $($a.Name) (exit code $code)")
+                    # 0 = ok, -1978335189 = already up to date, -1978335135 = already installed
+                    if ($code -eq 0) {
+                        $ok++;   $q.Enqueue("[OK]   $($a.Name)"); $q.Enqueue("::ADD|$($a.Id)")
+                    } elseif ($code -eq -1978335189 -or $code -eq -1978335135) {
+                        $ok++;   $q.Enqueue("[OK]   $($a.Name) (already installed)")
+                    } else {
+                        $fail++; $q.Enqueue("[FAIL] $($a.Name) (exit code $code)")
+                    }
                 }
             }
             $q.Enqueue(">> Finished: $ok succeeded, $fail failed")
             $q.Enqueue('::DONE::')
         }
 
-        [void]$ctx.PS.AddScript($worker.ToString()).AddArgument($items).AddArgument($ctx.Queue)
+        [void]$ctx.PS.AddScript($worker.ToString()).AddArgument($items).AddArgument($ctx.Queue).AddArgument($mode)
         [void]$ctx.PS.BeginInvoke()
         $ctx.Timer.Start()
+    }
+
+    $ui.BtnInstall.Add_Click({
+        $items = @($ctx.Cards | Where-Object { $_.IsChecked } | ForEach-Object { $_.DataContext })
+        if ($items.Count -gt 0) { & $ctx.Run 'install' $items }
     }.GetNewClosure())
 
-    $ui.Log.AppendText("Welcome to Azeron Tool Box.`r`nPick the apps you want and press 'Install selected'.`r`n")
+    $ui.BtnUninstall.Add_Click({
+        $items = @($ctx.Cards | Where-Object { $_.IsChecked -and $ctx.Installed.ContainsKey($_.DataContext.Id) } | ForEach-Object { $_.DataContext })
+        if ($items.Count -eq 0) { return }
+        $msg = "Uninstall $($items.Count) app(s)?`r`n`r`n" + (($items | ForEach-Object { $_.Name }) -join ', ')
+        if ([Windows.MessageBox]::Show($msg, "Azeron's Tool Box", 'YesNo', 'Question') -ne 'Yes') { return }
+        & $ctx.Run 'uninstall' $items
+    }.GetNewClosure())
+
+    $ui.Log.AppendText("Welcome to Azeron's Tool Box.`r`nPick the apps you want and press 'Install selected'.`r`n")
     [void]$win.ShowDialog()
 }
 
