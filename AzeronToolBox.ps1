@@ -1,92 +1,80 @@
 <#
     AZERON TOOL BOX
     Modern WPF software installer for Windows (uses winget).
-    Single file, no extra downloads - the UI opens instantly.
+    Single file - the UI opens instantly; app icons load in the background
+    and are cached in %APPDATA%\AzeronToolBox\icons.
 
     Run:  powershell -ExecutionPolicy Bypass -File .\AzeronToolBox.ps1
-    Or host the file and run:  irm <your-raw-url>/AzeronToolBox.ps1 | iex
+    Or:   irm <your-raw-url>/AzeronToolBox.ps1 | iex
 #>
 
 $main = {
     Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 
     # ------------------------------------------------------------------
-    # CATALOG  (Category|Name|winget ID)  - add or remove lines freely
+    # CATALOG  (Category|Name|winget ID|website for the icon)
     # ------------------------------------------------------------------
     $catalog = @(
-        'Browsers|Google Chrome|Google.Chrome'
-        'Browsers|Mozilla Firefox|Mozilla.Firefox'
-        'Browsers|Brave|Brave.Brave'
-        'Browsers|Opera GX|Opera.OperaGX'
-        'Browsers|Vivaldi|Vivaldi.Vivaldi'
-        'Communication|Discord|Discord.Discord'
-        'Communication|Telegram|Telegram.TelegramDesktop'
-        'Communication|Signal|OpenWhisperSystems.Signal'
-        'Communication|Slack|SlackTechnologies.Slack'
-        'Communication|Zoom|Zoom.Zoom'
-        'Communication|Microsoft Teams|Microsoft.Teams'
-        'Gaming|Steam|Valve.Steam'
-        'Gaming|Epic Games Launcher|EpicGames.EpicGamesLauncher'
-        'Gaming|GOG Galaxy|GOG.Galaxy'
-        'Gaming|EA app|ElectronicArts.EADesktop'
-        'Gaming|Ubisoft Connect|Ubisoft.Connect'
-        'Gaming|Battle.net|Blizzard.BattleNet'
-        'Media|VLC|VideoLAN.VLC'
-        'Media|Spotify|Spotify.Spotify'
-        'Media|OBS Studio|OBSProject.OBSStudio'
-        'Media|Audacity|Audacity.Audacity'
-        'Media|HandBrake|HandBrake.HandBrake'
-        'Media|MPC-HC|clsid2.mpc-hc'
-        'Development|Visual Studio Code|Microsoft.VisualStudioCode'
-        'Development|Git|Git.Git'
-        'Development|GitHub Desktop|GitHub.GitHubDesktop'
-        'Development|Python 3.13|Python.Python.3.13'
-        'Development|Node.js LTS|OpenJS.NodeJS.LTS'
-        'Development|Notepad++|Notepad++.Notepad++'
-        'Development|Windows Terminal|Microsoft.WindowsTerminal'
-        'Development|PowerShell 7|Microsoft.PowerShell'
-        'Development|Docker Desktop|Docker.DockerDesktop'
-        'Development|Postman|Postman.Postman'
-        'Utilities|7-Zip|7zip.7zip'
-        'Utilities|WinRAR|RARLab.WinRAR'
-        'Utilities|PowerToys|Microsoft.PowerToys'
-        'Utilities|Everything|voidtools.Everything'
-        'Utilities|ShareX|ShareX.ShareX'
-        'Utilities|Rufus|Rufus.Rufus'
-        'Utilities|qBittorrent|qBittorrent.qBittorrent'
-        'Utilities|AnyDesk|AnyDeskSoftwareGmbH.AnyDesk'
-        'Utilities|TeamViewer|TeamViewer.TeamViewer'
-        'Utilities|SumatraPDF|SumatraPDF.SumatraPDF'
-        'Utilities|Adobe Acrobat Reader|Adobe.Acrobat.Reader.64-bit'
-        'Utilities|Bitwarden|Bitwarden.Bitwarden'
-        'System|CPU-Z|CPUID.CPU-Z'
-        'System|HWiNFO|REALiX.HWiNFO'
-        'System|Wireshark|WiresharkFoundation.Wireshark'
-        'System|Malwarebytes|Malwarebytes.Malwarebytes'
-        'System|Proton VPN|Proton.ProtonVPN'
-        'Creative|GIMP|GIMP.GIMP'
-        'Creative|Blender|BlenderFoundation.Blender'
-        'Creative|Inkscape|Inkscape.Inkscape'
-        'Creative|Krita|KDE.Krita'
-        'Creative|Paint.NET|dotPDN.PaintDotNet'
-        'Creative|Figma|Figma.Figma'
+        'Browsers|Google Chrome|Google.Chrome|google.com/chrome'
+        'Browsers|Mozilla Firefox|Mozilla.Firefox|firefox.com'
+        'Browsers|Brave|Brave.Brave|brave.com'
+        'Browsers|Opera GX|Opera.OperaGX|opera.com/gx'
+        'Browsers|Vivaldi|Vivaldi.Vivaldi|vivaldi.com'
+        'Communication|Discord|Discord.Discord|discord.com'
+        'Communication|Telegram|Telegram.TelegramDesktop|telegram.org'
+        'Communication|Signal|OpenWhisperSystems.Signal|signal.org'
+        'Communication|Slack|SlackTechnologies.Slack|slack.com'
+        'Communication|Zoom|Zoom.Zoom|zoom.us'
+        'Communication|Microsoft Teams|Microsoft.Teams|teams.microsoft.com'
+        'Gaming|Steam|Valve.Steam|store.steampowered.com'
+        'Gaming|Epic Games Launcher|EpicGames.EpicGamesLauncher|epicgames.com'
+        'Gaming|GOG Galaxy|GOG.Galaxy|gog.com'
+        'Gaming|EA app|ElectronicArts.EADesktop|ea.com'
+        'Gaming|Ubisoft Connect|Ubisoft.Connect|ubisoft.com'
+        'Gaming|Battle.net|Blizzard.BattleNet|battle.net'
+        'Media|VLC|VideoLAN.VLC|videolan.org'
+        'Media|Spotify|Spotify.Spotify|spotify.com'
+        'Media|OBS Studio|OBSProject.OBSStudio|obsproject.com'
+        'Media|Audacity|Audacity.Audacity|audacityteam.org'
+        'Media|HandBrake|HandBrake.HandBrake|handbrake.fr'
+        'Media|MPC-HC|clsid2.mpc-hc|mpc-hc.org'
+        'Development|Visual Studio Code|Microsoft.VisualStudioCode|code.visualstudio.com'
+        'Development|Git|Git.Git|git-scm.com'
+        'Development|GitHub Desktop|GitHub.GitHubDesktop|desktop.github.com'
+        'Development|Python 3.13|Python.Python.3.13|python.org'
+        'Development|Node.js LTS|OpenJS.NodeJS.LTS|nodejs.org'
+        'Development|Notepad++|Notepad++.Notepad++|notepad-plus-plus.org'
+        'Development|Windows Terminal|Microsoft.WindowsTerminal|'
+        'Development|PowerShell 7|Microsoft.PowerShell|'
+        'Development|Docker Desktop|Docker.DockerDesktop|docker.com'
+        'Development|Postman|Postman.Postman|postman.com'
+        'Utilities|7-Zip|7zip.7zip|7-zip.org'
+        'Utilities|WinRAR|RARLab.WinRAR|win-rar.com'
+        'Utilities|PowerToys|Microsoft.PowerToys|'
+        'Utilities|Everything|voidtools.Everything|voidtools.com'
+        'Utilities|ShareX|ShareX.ShareX|getsharex.com'
+        'Utilities|Rufus|Rufus.Rufus|rufus.ie'
+        'Utilities|qBittorrent|qBittorrent.qBittorrent|qbittorrent.org'
+        'Utilities|AnyDesk|AnyDeskSoftwareGmbH.AnyDesk|anydesk.com'
+        'Utilities|TeamViewer|TeamViewer.TeamViewer|teamviewer.com'
+        'Utilities|SumatraPDF|SumatraPDF.SumatraPDF|sumatrapdfreader.org'
+        'Utilities|Adobe Acrobat Reader|Adobe.Acrobat.Reader.64-bit|adobe.com/acrobat'
+        'Utilities|Bitwarden|Bitwarden.Bitwarden|bitwarden.com'
+        'System|CPU-Z|CPUID.CPU-Z|cpuid.com'
+        'System|HWiNFO|REALiX.HWiNFO|hwinfo.com'
+        'System|Wireshark|WiresharkFoundation.Wireshark|wireshark.org'
+        'System|Malwarebytes|Malwarebytes.Malwarebytes|malwarebytes.com'
+        'System|Proton VPN|Proton.ProtonVPN|protonvpn.com'
+        'Creative|GIMP|GIMP.GIMP|gimp.org'
+        'Creative|Blender|BlenderFoundation.Blender|blender.org'
+        'Creative|Inkscape|Inkscape.Inkscape|inkscape.org'
+        'Creative|Krita|KDE.Krita|krita.org'
+        'Creative|Paint.NET|dotPDN.PaintDotNet|getpaint.net'
+        'Creative|Figma|Figma.Figma|figma.com'
     )
 
     # ------------------------------------------------------------------
-    # THEMES
-    # ------------------------------------------------------------------
-    $themes = [ordered]@{
-        'Midnight' = @{ Bg='#0F1220'; Surface='#151932'; Card='#1B2040'; CardHover='#242A52'; Text='#EEF1FF'; Sub='#8B93B8'; Accent='#6C8CFF'; AccentText='#0B1030'; Line='#2A3052' }
-        'Light'    = @{ Bg='#F4F6FB'; Surface='#FFFFFF'; Card='#FFFFFF'; CardHover='#EEF2FF'; Text='#1A2038'; Sub='#6B7391'; Accent='#4F6BED'; AccentText='#FFFFFF'; Line='#DCE1F0' }
-        'Violet'   = @{ Bg='#130B22'; Surface='#1A1030'; Card='#22163D'; CardHover='#2D1E52'; Text='#F3EBFF'; Sub='#A592C8'; Accent='#B26BFF'; AccentText='#1A0B30'; Line='#35244F' }
-        'Emerald'  = @{ Bg='#08140F'; Surface='#0D1D16'; Card='#12281E'; CardHover='#183629'; Text='#E8FFF4'; Sub='#7FB09A'; Accent='#2EE59D'; AccentText='#04150D'; Line='#1E3B2D' }
-        'Sunset'   = @{ Bg='#1A0F0C'; Surface='#241510'; Card='#2E1B15'; CardHover='#3B241C'; Text='#FFF1EA'; Sub='#BC9484'; Accent='#FF7A45'; AccentText='#2A0E04'; Line='#4A2D23' }
-        'Carbon'   = @{ Bg='#0C0C0D'; Surface='#131315'; Card='#1A1A1D'; CardHover='#232327'; Text='#F2F2F3'; Sub='#8D8D95'; Accent='#E8E8EC'; AccentText='#111113'; Line='#2A2A2F' }
-    }
-    $themeMap = @{ Bg='BgBrush'; Surface='SurfaceBrush'; Card='CardBrush'; CardHover='CardHoverBrush'; Text='TextBrush'; Sub='SubTextBrush'; Accent='AccentBrush'; AccentText='AccentTextBrush'; Line='LineBrush' }
-
-    # ------------------------------------------------------------------
-    # XAML
+    # XAML  (single "Carbon" theme)
     # ------------------------------------------------------------------
     $xaml = @'
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -95,15 +83,15 @@ $main = {
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="CanMinimize" FontFamily="Segoe UI" UseLayoutRounding="True">
   <Window.Resources>
-    <SolidColorBrush x:Key="BgBrush" Color="#0F1220"/>
-    <SolidColorBrush x:Key="SurfaceBrush" Color="#151932"/>
-    <SolidColorBrush x:Key="CardBrush" Color="#1B2040"/>
-    <SolidColorBrush x:Key="CardHoverBrush" Color="#242A52"/>
-    <SolidColorBrush x:Key="TextBrush" Color="#EEF1FF"/>
-    <SolidColorBrush x:Key="SubTextBrush" Color="#8B93B8"/>
-    <SolidColorBrush x:Key="AccentBrush" Color="#6C8CFF"/>
-    <SolidColorBrush x:Key="AccentTextBrush" Color="#0B1030"/>
-    <SolidColorBrush x:Key="LineBrush" Color="#2A3052"/>
+    <SolidColorBrush x:Key="BgBrush" Color="#0C0C0D"/>
+    <SolidColorBrush x:Key="SurfaceBrush" Color="#131315"/>
+    <SolidColorBrush x:Key="CardBrush" Color="#1A1A1D"/>
+    <SolidColorBrush x:Key="CardHoverBrush" Color="#232327"/>
+    <SolidColorBrush x:Key="TextBrush" Color="#F2F2F3"/>
+    <SolidColorBrush x:Key="SubTextBrush" Color="#8D8D95"/>
+    <SolidColorBrush x:Key="AccentBrush" Color="#E8E8EC"/>
+    <SolidColorBrush x:Key="AccentTextBrush" Color="#111113"/>
+    <SolidColorBrush x:Key="LineBrush" Color="#2A2A2F"/>
 
     <!-- Thin modern vertical scrollbar -->
     <Style TargetType="ScrollBar">
@@ -133,10 +121,11 @@ $main = {
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="FontWeight" Value="SemiBold"/>
       <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="16,9"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="10" Padding="16,9">
+            <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="10" Padding="{TemplateBinding Padding}">
               <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
                                 TextElement.Foreground="{TemplateBinding Foreground}"/>
             </Border>
@@ -155,23 +144,6 @@ $main = {
     <Style x:Key="GhostBtn" TargetType="Button" BasedOn="{StaticResource PillBase}">
       <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
       <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-    </Style>
-
-    <!-- Theme swatch -->
-    <Style x:Key="SwatchBtn" TargetType="Button">
-      <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Margin" Value="4,0"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="Button">
-            <Border x:Name="bd" Width="22" Height="22" CornerRadius="11" Background="{TemplateBinding Background}"
-                    BorderBrush="{DynamicResource TextBrush}" BorderThickness="0"/>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="bd" Property="BorderThickness" Value="2"/></Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
     </Style>
 
     <!-- Sidebar category button -->
@@ -201,29 +173,38 @@ $main = {
       </Setter>
     </Style>
 
-    <!-- App card (CheckBox) -->
+    <!-- App card (CheckBox) with icon -->
     <Style x:Key="AppCard" TargetType="CheckBox">
       <Setter Property="Cursor" Value="Hand"/>
-      <Setter Property="Width" Value="190"/>
+      <Setter Property="Width" Value="258"/>
       <Setter Property="Height" Value="64"/>
       <Setter Property="Margin" Value="6"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="CheckBox">
             <Border x:Name="bd" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource LineBrush}"
-                    BorderThickness="1.5" CornerRadius="12" Padding="14,10">
+                    BorderThickness="1.5" CornerRadius="12" Padding="12,0">
               <Grid>
                 <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel VerticalAlignment="Center">
+                <Border Width="38" Height="38" CornerRadius="9" Background="#F2F2F5" VerticalAlignment="Center">
+                  <Grid>
+                    <TextBlock x:Name="lt" FontSize="17" FontWeight="Bold" Foreground="#333338"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <Image x:Name="ico" Width="26" Height="26" RenderOptions.BitmapScalingMode="HighQuality"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  </Grid>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
                   <TextBlock Text="{TemplateBinding Content}" Foreground="{DynamicResource TextBrush}"
                              FontWeight="SemiBold" FontSize="13" TextTrimming="CharacterEllipsis"/>
                   <TextBlock Text="{TemplateBinding Tag}" Foreground="{DynamicResource SubTextBrush}"
                              FontSize="11" Margin="0,2,0,0"/>
                 </StackPanel>
-                <Border x:Name="ck" Grid.Column="1" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5"
+                <Border x:Name="ck" Grid.Column="2" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5"
                         BorderBrush="{DynamicResource LineBrush}" Margin="8,0,0,0">
                   <Path x:Name="tick" Data="M5,10 L8.5,13.5 L14.5,6.5" Stroke="{DynamicResource AccentTextBrush}"
                         StrokeThickness="2" Visibility="Collapsed"/>
@@ -260,7 +241,6 @@ $main = {
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
-          <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
           <Border Width="34" Height="34" CornerRadius="10" Background="{DynamicResource AccentBrush}">
@@ -272,10 +252,15 @@ $main = {
             <TextBlock Text="Install your favorite software in one click" FontSize="11" Foreground="{DynamicResource SubTextBrush}"/>
           </StackPanel>
         </StackPanel>
-        <StackPanel x:Name="Themes" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,18,0"/>
-        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-          <Button x:Name="BtnMin" Style="{StaticResource GhostBtn}" Content="&#x2014;" Padding="0" Width="34" Height="30" Margin="0,0,6,0"/>
-          <Button x:Name="BtnClose" Style="{StaticResource GhostBtn}" Content="&#x2715;" Padding="0" Width="34" Height="30"/>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="BtnMin" Style="{StaticResource GhostBtn}" Padding="0" Width="36" Height="30" Margin="0,0,6,0">
+            <Path Data="M0,0 L11,0" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Button>
+          <Button x:Name="BtnClose" Style="{StaticResource GhostBtn}" Padding="0" Width="36" Height="30">
+            <Path Data="M0,0 L10,10 M10,0 L0,10" Stroke="{DynamicResource TextBrush}" StrokeThickness="1.6"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Button>
         </StackPanel>
       </Grid>
 
@@ -355,11 +340,10 @@ $main = {
     $win = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader $xml))
 
     $ui = @{}
-    foreach ($n in 'TitleBar','BtnMin','BtnClose','Themes','Nav','CardPanel','Search','SearchHint','BtnAll','BtnNone','BtnInstall','Log','Progress','Status','AdminInfo') {
+    foreach ($n in 'TitleBar','BtnMin','BtnClose','Nav','CardPanel','Search','SearchHint','BtnAll','BtnNone','BtnInstall','Log','Progress','Status','AdminInfo') {
         $ui[$n] = $win.FindName($n)
     }
     $ctx = @{ Cards = New-Object System.Collections.ArrayList; Cat = 'All'; Busy = $false }
-    $bc  = New-Object Windows.Media.BrushConverter
 
     # Admin info
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
@@ -386,32 +370,44 @@ $main = {
     }
     $ctx.OnToggle = { & $ctx.Refresh }.GetNewClosure()
 
-    # Theme switcher
-    $ctx.ApplyTheme = {
-        param($name)
-        $t = $themes[$name]
-        if (-not $t) { return }
-        foreach ($k in $themeMap.Keys) { $win.Resources[$themeMap[$k]] = $bc.ConvertFromString($t[$k]) }
-        try {
-            $dir = Join-Path $env:APPDATA 'AzeronToolBox'
-            if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir | Out-Null }
-            Set-Content -Path (Join-Path $dir 'theme.txt') -Value $name
-        } catch {}
-    }.GetNewClosure()
+    # Icons: loaded asynchronously (UI never waits), cached on disk after first download
+    $ctx.IconDir = Join-Path $env:APPDATA 'AzeronToolBox\icons'
+    try { if (-not (Test-Path $ctx.IconDir)) { New-Item -ItemType Directory -Path $ctx.IconDir -Force | Out-Null } } catch {}
 
-    foreach ($name in $themes.Keys) {
-        $b = New-Object Windows.Controls.Button
-        $b.Style      = $win.FindResource('SwatchBtn')
-        $b.Background = $bc.ConvertFromString($themes[$name].Accent)
-        $b.ToolTip    = $name
-        $b.Tag        = $name
-        $b.Add_Click({ param($s, $e) & $ctx.ApplyTheme $s.Tag }.GetNewClosure())
-        [void]$ui.Themes.Children.Add($b)
+    $ctx.LoadIcon = {
+        param($card)
+        $app = $card.DataContext
+        $img = $card.Template.FindName('ico', $card)
+        $lt  = $card.Template.FindName('lt',  $card)
+        if (-not $img -or $img.Source) { return }
+        $lt.Text = $app.Name.Substring(0, 1).ToUpper()
+        if (-not $app.Domain) { $lt.Visibility = 'Visible'; return }
+
+        $file   = Join-Path $ctx.IconDir (($app.Domain -replace '[^a-zA-Z0-9]', '_') + '.png')
+        $cached = Test-Path $file
+        $bi = New-Object Windows.Media.Imaging.BitmapImage
+        $bi.BeginInit()
+        if ($cached) {
+            $bi.CacheOption = 'OnLoad'
+            $bi.UriSource   = [Uri]$file
+        } else {
+            $bi.UriSource = [Uri]('https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&size=128&url=https://' + $app.Domain)
+        }
+        $bi.EndInit()
+        if (-not $cached) {
+            $bi.Add_DownloadCompleted({
+                try {
+                    $enc = New-Object Windows.Media.Imaging.PngBitmapEncoder
+                    $enc.Frames.Add([Windows.Media.Imaging.BitmapFrame]::Create($bi))
+                    $fs = [IO.File]::Create($file)
+                    $enc.Save($fs)
+                    $fs.Dispose()
+                } catch {}
+            }.GetNewClosure())
+            $bi.Add_DownloadFailed({ $lt.Visibility = 'Visible' }.GetNewClosure())
+        }
+        $img.Source = $bi
     }
-    try {
-        $saved = (Get-Content (Join-Path $env:APPDATA 'AzeronToolBox\theme.txt') -ErrorAction Stop | Select-Object -First 1).Trim()
-        if ($themes.Contains($saved)) { & $ctx.ApplyTheme $saved }
-    } catch {}
 
     # App cards
     $cardStyle = $win.FindResource('AppCard')
@@ -421,9 +417,10 @@ $main = {
         $cb.Style       = $cardStyle
         $cb.Content     = $p[1]
         $cb.Tag         = $p[0]
-        $cb.DataContext = [pscustomobject]@{ Cat = $p[0]; Name = $p[1]; Id = $p[2] }
+        $cb.DataContext = [pscustomobject]@{ Cat = $p[0]; Name = $p[1]; Id = $p[2]; Domain = $p[3] }
         $cb.Add_Checked($ctx.OnToggle)
         $cb.Add_Unchecked($ctx.OnToggle)
+        $cb.Add_Loaded({ param($s, $e) & $ctx.LoadIcon $s }.GetNewClosure())
         [void]$ctx.Cards.Add($cb)
         [void]$ui.CardPanel.Children.Add($cb)
     }
@@ -515,7 +512,7 @@ $main = {
                 }
                 # 0 = ok, -1978335189 = already up to date, -1978335135 = already installed
                 if ($code -eq 0 -or $code -eq -1978335189 -or $code -eq -1978335135) {
-                    $ok++;  $q.Enqueue("[OK]   $($a.Name)")
+                    $ok++;   $q.Enqueue("[OK]   $($a.Name)")
                 } else {
                     $fail++; $q.Enqueue("[FAIL] $($a.Name) (exit code $code)")
                 }
